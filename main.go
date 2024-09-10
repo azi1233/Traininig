@@ -2,22 +2,25 @@ package main
 
 import (
 	"errors"
+	"sync"
 )
 
 type Comment struct {
 	// do not modify or remove these fields
+	mu    *sync.Mutex
 	Score int
 	Text  string
 	// but you can add anything you want
 }
 
 type Survey struct {
-	S map[string]map[string]Comment
+	mu *sync.Mutex
+	S  map[string]map[string]Comment
 }
 
 func NewSurvey() *Survey {
 	tempComment := make(map[string]map[string]Comment)
-	return &Survey{tempComment}
+	return &Survey{&sync.Mutex{}, tempComment}
 }
 
 func (s *Survey) AddFlight(flightName string) error {
@@ -25,7 +28,9 @@ func (s *Survey) AddFlight(flightName string) error {
 	if exists {
 		return errors.New("flight exists")
 	} else {
+		s.mu.Lock()
 		s.S[flightName] = make(map[string]Comment)
+		s.mu.Unlock()
 		return nil
 	}
 }
@@ -42,7 +47,9 @@ func (s *Survey) AddTicket(flightName, passengerName string) error {
 		return errors.New("duplicate ticket")
 
 	}
+	s.mu.Lock()
 	s.S[flightName][passengerName] = Comment{}
+	s.mu.Unlock()
 	return nil
 }
 
@@ -65,8 +72,9 @@ func (s *Survey) AddComment(flightName, passengerName string, comment Comment) e
 	if flighexists && passengerExistInFlight && (s.S[flightName][passengerName].Text == "") && ((comment.Score < 1) && (comment.Score > 10)) {
 		return errors.New("incorrect score")
 	}
-
+	s.mu.Lock()
 	s.S[flightName][passengerName] = comment
+	s.mu.Unlock()
 
 	return nil
 }
