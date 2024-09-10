@@ -47,9 +47,15 @@ func (s *Survey) AddTicket(flightName, passengerName string) error {
 		return errors.New("duplicate ticket")
 
 	}
+<<<<<<< HEAD
 	s.mu.Lock()
 	s.S[flightName][passengerName] = Comment{}
 	s.mu.Unlock()
+=======
+	s.S[flightName][passengerName].mu.Lock()
+	s.S[flightName][passengerName] = Comment{}
+	s.S[flightName][passengerName].mu.Unlock()
+>>>>>>> 9c916331143118bd7c9d6e736b68c0af693a4b46
 	return nil
 }
 
