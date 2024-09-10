@@ -26,18 +26,22 @@ func NewSurvey() *Survey {
 }
 
 func (s *Survey) AddFlight(flightName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	_, exists := s.S[flightName]
 	if exists {
 		return errors.New("flight exists")
 	} else {
-		s.mu.Lock()
+
 		s.S[flightName] = passObj{&sync.Mutex{}, make(map[string]Comment)}
-		s.mu.Unlock()
+
 		return nil
 	}
 }
 
 func (s *Survey) AddTicket(flightName, passengerName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	_, flighexists := s.S[flightName]
 
@@ -50,14 +54,14 @@ func (s *Survey) AddTicket(flightName, passengerName string) error {
 
 	}
 
-	s.S[flightName].mu.Lock()
 	s.S[flightName].P[passengerName] = Comment{}
-	s.S[flightName].mu.Unlock()
 
 	return nil
 }
 
 func (s *Survey) AddComment(flightName, passengerName string, comment Comment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	_, flighexists := s.S[flightName]
 	if !flighexists {
@@ -76,9 +80,8 @@ func (s *Survey) AddComment(flightName, passengerName string, comment Comment) e
 	if flighexists && passengerExistInFlight && (s.S[flightName].P[passengerName].Text == "") && ((comment.Score < 1) && (comment.Score > 10)) {
 		return errors.New("incorrect score")
 	}
-	s.S[flightName].mu.Lock()
+
 	s.S[flightName].P[passengerName] = comment
-	s.S[flightName].mu.Unlock()
 
 	return nil
 }
