@@ -1,5 +1,9 @@
 package main
 
+import (
+	"errors"
+)
+
 type Comment struct {
 	// do not modify or remove these fields
 	Score int
@@ -8,36 +12,120 @@ type Comment struct {
 }
 
 type Survey struct {
+	S map[string]map[string]Comment
 }
 
 func NewSurvey() *Survey {
-	return &Survey{}
+	tempComment := make(map[string]map[string]Comment)
+	return &Survey{tempComment}
 }
 
 func (s *Survey) AddFlight(flightName string) error {
-	return nil
+	_, exists := s.S[flightName]
+	if exists {
+		return errors.New("flight exists")
+	} else {
+		s.S[flightName] = make(map[string]Comment)
+		return nil
+	}
 }
 
 func (s *Survey) AddTicket(flightName, passengerName string) error {
+
+	_, flighexists := s.S[flightName]
+
+	if !flighexists {
+		return errors.New("flight doesn't exists, unable to issue the ticket")
+	}
+	_, passengerExistInFlight := s.S[flightName][passengerName]
+	if flighexists && passengerExistInFlight {
+		return errors.New("duplicate ticket")
+
+	}
+	s.S[flightName][passengerName] = Comment{}
 	return nil
 }
 
 func (s *Survey) AddComment(flightName, passengerName string, comment Comment) error {
+
+	_, flighexists := s.S[flightName]
+	if !flighexists {
+		return errors.New("flight doesn't exists, unable to add the comment")
+	}
+
+	_, passengerExistInFlight := s.S[flightName][passengerName]
+	if flighexists && !passengerExistInFlight {
+		return errors.New("no ticket exists for this passenger")
+	}
+
+	if flighexists && passengerExistInFlight && (s.S[flightName][passengerName].Text != "") {
+		return errors.New("this passenger has commented before")
+	}
+
+	if flighexists && passengerExistInFlight && (s.S[flightName][passengerName].Text == "") && ((comment.Score < 1) && (comment.Score > 10)) {
+		return errors.New("incorrect score")
+	}
+
+	s.S[flightName][passengerName] = comment
+
 	return nil
 }
 
 func (s *Survey) GetCommentsAverage(flightName string) (float64, error) {
-	return 0, nil
+	valObj, flightExists := s.S[flightName]
+	if !flightExists {
+		return 0, errors.New("flight doesn't exist. unable to return average point")
+	}
+	var tempFloat float64
+	var commentNum int
+	for _, commentInLoop := range valObj {
+		if commentInLoop.Score != 0 {
+			tempFloat = tempFloat + float64(commentInLoop.Score)
+			commentNum++
+		}
+	}
+	if commentNum == 0 {
+		return 0, errors.New("no comment available for this flight")
+	} else {
+		tempFloat = tempFloat / float64(commentNum)
+		return tempFloat, nil
+	}
+
 }
 
 func (s *Survey) GetAllCommentsAverage() map[string]float64 {
-	return nil
+	output := make(map[string]float64)
+	for flightName, _ := range s.S {
+		tempAverage, _ := s.GetCommentsAverage(flightName)
+		if tempAverage != 0 {
+			output[flightName] = tempAverage
+		}
+	}
+	return output
 }
 
 func (s *Survey) GetComments(flightName string) ([]string, error) {
-	return nil, nil
+	var output []string
+
+	_, flightexists := s.S[flightName]
+	if !flightexists {
+		return output, errors.New("flight doesn't exist. GetComment error")
+	}
+
+	for _, commentObj := range s.S[flightName] {
+		if commentObj.Text != "" {
+			output = append(output, commentObj.Text)
+		}
+	}
+
+	return output, nil
 }
 
 func (s *Survey) GetAllComments() map[string][]string {
-	return nil
+	output := make(map[string][]string)
+	for flightName, _ := range s.S {
+		comments, _ := s.GetComments(flightName)
+		output[flightName] = comments
+	}
+	return output
 }
