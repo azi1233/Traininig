@@ -6,8 +6,6 @@ import (
 )
 
 type Comment struct {
-	// do not modify or remove these fields
-	mu    *sync.Mutex
 	Score int
 	Text  string
 	// but you can add anything you want
@@ -15,11 +13,15 @@ type Comment struct {
 
 type Survey struct {
 	mu *sync.Mutex
-	S  map[string]map[string]Comment
+	S  map[string]passObj
+}
+type passObj struct {
+	mu *sync.Mutex
+	P  map[string]Comment
 }
 
 func NewSurvey() *Survey {
-	tempComment := make(map[string]map[string]Comment)
+	tempComment := make(map[string]passObj)
 	return &Survey{&sync.Mutex{}, tempComment}
 }
 
@@ -29,7 +31,7 @@ func (s *Survey) AddFlight(flightName string) error {
 		return errors.New("flight exists")
 	} else {
 		s.mu.Lock()
-		s.S[flightName] = make(map[string]Comment)
+		s.S[flightName] = passObj{&sync.Mutex{}, make(map[string]Comment)}
 		s.mu.Unlock()
 		return nil
 	}
@@ -42,20 +44,16 @@ func (s *Survey) AddTicket(flightName, passengerName string) error {
 	if !flighexists {
 		return errors.New("flight doesn't exists, unable to issue the ticket")
 	}
-	_, passengerExistInFlight := s.S[flightName][passengerName]
+	_, passengerExistInFlight := s.S[flightName].P[passengerName]
 	if flighexists && passengerExistInFlight {
 		return errors.New("duplicate ticket")
 
 	}
-<<<<<<< HEAD
-	s.mu.Lock()
-	s.S[flightName][passengerName] = Comment{}
-	s.mu.Unlock()
-=======
-	s.S[flightName][passengerName].mu.Lock()
-	s.S[flightName][passengerName] = Comment{}
-	s.S[flightName][passengerName].mu.Unlock()
->>>>>>> 9c916331143118bd7c9d6e736b68c0af693a4b46
+
+	s.S[flightName].mu.Lock()
+	s.S[flightName].P[passengerName] = Comment{}
+	s.S[flightName].mu.Unlock()
+
 	return nil
 }
 
@@ -66,21 +64,21 @@ func (s *Survey) AddComment(flightName, passengerName string, comment Comment) e
 		return errors.New("flight doesn't exists, unable to add the comment")
 	}
 
-	_, passengerExistInFlight := s.S[flightName][passengerName]
+	_, passengerExistInFlight := s.S[flightName].P[passengerName]
 	if flighexists && !passengerExistInFlight {
 		return errors.New("no ticket exists for this passenger")
 	}
 
-	if flighexists && passengerExistInFlight && (s.S[flightName][passengerName].Text != "") {
+	if flighexists && passengerExistInFlight && (s.S[flightName].P[passengerName].Text != "") {
 		return errors.New("this passenger has commented before")
 	}
 
-	if flighexists && passengerExistInFlight && (s.S[flightName][passengerName].Text == "") && ((comment.Score < 1) && (comment.Score > 10)) {
+	if flighexists && passengerExistInFlight && (s.S[flightName].P[passengerName].Text == "") && ((comment.Score < 1) && (comment.Score > 10)) {
 		return errors.New("incorrect score")
 	}
-	s.mu.Lock()
-	s.S[flightName][passengerName] = comment
-	s.mu.Unlock()
+	s.S[flightName].mu.Lock()
+	s.S[flightName].P[passengerName] = comment
+	s.S[flightName].mu.Unlock()
 
 	return nil
 }
@@ -92,7 +90,7 @@ func (s *Survey) GetCommentsAverage(flightName string) (float64, error) {
 	}
 	var tempFloat float64
 	var commentNum int
-	for _, commentInLoop := range valObj {
+	for _, commentInLoop := range valObj.P {
 		if commentInLoop.Score != 0 {
 			tempFloat = tempFloat + float64(commentInLoop.Score)
 			commentNum++
@@ -126,7 +124,7 @@ func (s *Survey) GetComments(flightName string) ([]string, error) {
 		return output, errors.New("flight doesn't exist. GetComment error")
 	}
 
-	for _, commentObj := range s.S[flightName] {
+	for _, commentObj := range s.S[flightName].P {
 		if commentObj.Text != "" {
 			output = append(output, commentObj.Text)
 		}
