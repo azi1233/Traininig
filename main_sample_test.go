@@ -1,54 +1,79 @@
 package main
 
 import (
+	"bytes"
+	"fmt"
+	"io"
+	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestFlightAddSample(t *testing.T) {
-	var err error
-	s := NewSurvey()
-	err = s.AddFlight("my-flight")
-	assert.NoError(t, err)
-	err = s.AddFlight("my-flight")
-	assert.Error(t, err)
-}
+const portNoSample = 1235
 
-func TestTicketAddSample(t *testing.T) {
-	var err error
-	s := NewSurvey()
-
-	_ = s.AddFlight("abc")
-
-	err = s.AddTicket("abc", "p2")
-	assert.NoError(t, err)
-}
+var addrSample string = fmt.Sprintf("http://127.0.0.1:%d/", portNoSample)
+var ctjSample string = `application/json`
 
 func TestSample(t *testing.T) {
-	var err error
-	s := NewSurvey()
+	server := NewServer(portNoSample)
+	go server.Start()
+	time.Sleep(10000 * time.Millisecond)
 
-	err = s.AddFlight("my-flight")
-	assert.NoError(t, err)
-	err = s.AddFlight("my-flight")
-	assert.Error(t, err)
+	{
+		resp, err := http.DefaultClient.Post(addrSample+"flights", ctjSample, bytes.NewBufferString(`{ "Name" : "f9" }`))
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK"}`, string(body))
+		assert.Equal(t, resp.StatusCode, 201)
+	}
 
-	err = s.AddTicket("my-flight", "p1")
-	assert.NoError(t, err)
-	err = s.AddTicket("my-flight", "p2")
-	assert.NoError(t, err)
+	{
+		resp, err := http.DefaultClient.Post(addrSample+"tickets", ctjSample,
+			bytes.NewBufferString(`{ "FlightName" : "f9", "PassengerName" : "p1"}`))
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK"}`, string(body))
+		assert.Equal(t, resp.StatusCode, 201)
+	}
+	{
+		resp, err := http.DefaultClient.Post(addrSample+"tickets", ctjSample,
+			bytes.NewBufferString(`{ "FlightName" : "f9", "PassengerName" : "p2"}`))
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK"}`, string(body))
+		assert.Equal(t, resp.StatusCode, 201)
+	}
+	{
+		resp, err := http.DefaultClient.Post(addrSample+"comments", ctjSample,
+			bytes.NewBufferString(`{ "FlightName" : "f9", "PassengerName" : "p1", "Score" : 8, "Text" : "random comment" }`))
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK"}`, string(body))
+		assert.Equal(t, resp.StatusCode, 201)
+	}
 
-	err = s.AddComment("my-flight", "p1", Comment{Score: 9, Text: "good"})
-	assert.NoError(t, err)
+	{
+		resp, err := http.DefaultClient.Get(addrSample + "comments/f9?average=true")
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK", "Average" : 8 }`, string(body))
+		assert.Equal(t, resp.StatusCode, 200)
+	}
 
-	err = s.AddComment("other flight", "p2", Comment{Score: 8, Text: "ok"})
-	assert.Error(t, err)
+	{
+		resp, err := http.DefaultClient.Get(addrSample + "comments/f9?average=false")
+		assert.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"Message" : "OK", "Texts" : [ "random comment" ]}`, string(body))
+		assert.Equal(t, resp.StatusCode, 200)
+	}
 
-	assert.EqualValues(t, 9, s.GetAllCommentsAverage()["my-flight"])
-
-	comments, err := s.GetComments("my-flight")
-	assert.NoError(t, err)
-	assert.Equal(t, []string{"good"}, comments)
-	assert.Equal(t, []string{"good"}, s.GetAllComments()["my-flight"])
 }
